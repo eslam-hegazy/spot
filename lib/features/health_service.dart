@@ -5,8 +5,8 @@ import 'package:spot/features/utils.dart';
 
 class HealthService {
   final Health _health = Health();
+  bool _permissionGranted = false;
 
-  /// Units for each type
   final Map<HealthDataType, String> typeUnits = {
     HealthDataType.HEART_RATE: "bpm",
     HealthDataType.RESTING_HEART_RATE: "bpm",
@@ -30,43 +30,104 @@ class HealthService {
     HealthDataType.BODY_TEMPERATURE: "°C",
   };
 
-  /// All data types depending on platform
   List<HealthDataType> get allTypes =>
       Platform.isAndroid ? dataTypesAndroid : dataTypesIOS;
 
-  /// Fetch only today's data for important metrics
+  void _log(String msg) {
+    // ignore: avoid_print
+    print("[HealthService] $msg");
+  }
+
+  /// Permission (only once)
+  Future<bool> requestPermissionsOnce() async {
+    if (_permissionGranted) {
+      _log("Permissions already granted");
+      return true;
+    }
+
+    _log("Requesting permissions for ${allTypes.length} types");
+
+    final granted = await _health.requestAuthorization(
+      allTypes,
+      permissions: allTypes.map((_) => HealthDataAccess.READ).toList(),
+    );
+
+    _permissionGranted = granted;
+    _log("Permission result: $granted");
+
+    return granted;
+  }
+
+  /// Fetch today's data
   Future<Map<HealthDataType, String>> fetchTodayData() async {
     final Map<HealthDataType, String> latestValues = {};
-    final now = DateTime.now();
-    final startOfDay = DateTime(now.year, now.month, now.day);
 
-    for (var type in allTypes) {
+    _log("Fetching today's health data...");
+
+    final granted = await requestPermissionsOnce();
+    if (!granted) {
+      _log("Permission denied — returning empty map");
+      return latestValues;
+    }
+
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+
+    /// STEPS
+    try {
+      final steps = await _health.getTotalStepsInInterval(start, now);
+      _log("STEPS: ${steps ?? 0}");
+      latestValues[HealthDataType.STEPS] =
+      "${steps ?? 0} ${typeUnits[HealthDataType.STEPS]}";
+    } catch (e) {
+      _log("STEPS error: $e");
+    }
+
+    /// OTHER TYPES
+    for (final type in allTypes) {
+      if (type == HealthDataType.STEPS) continue;
+
       try {
-        bool granted = await _health.requestAuthorization([type]);
-        if (!granted) {
-          latestValues[type] = "Access Denied";
-          continue;
-        }
+        _log("Reading $type");
 
         final data = await _health.getHealthDataFromTypes(
           types: [type],
-          startTime: startOfDay,
+          startTime: start,
           endTime: now,
         );
 
-        if (data.isNotEmpty) {
-          data.sort((a, b) => b.dateTo.compareTo(a.dateTo));
-          final value = data.first.value.toString();
-          final unit = typeUnits[type] ?? "";
-          latestValues[type] = "$value $unit";
-        } else {
-          latestValues[type] = "0 ${typeUnits[type] ?? ""}";
+        if (data.isEmpty) {
+          _log("→ $type: no data");
+          continue;
         }
+
+        data.sort((a, b) => b.dateTo.compareTo(a.dateTo));
+        final rawValue = data.first.value;
+        final parsed = _safeValue(rawValue);
+
+        _log(
+          "→ $type: "
+              "count=${data.length}, "
+              "raw=$rawValue, "
+              "parsed=$parsed",
+        );
+
+        latestValues[type] =
+        "$parsed ${typeUnits[type] ?? ""}";
       } catch (e) {
-        latestValues[type] = "Error";
+        _log("→ $type ERROR: $e");
       }
     }
 
+    _log("Finished fetching data. Returned ${latestValues.length} values");
     return latestValues;
+  }
+
+  String _safeValue(dynamic value) {
+    if (value is num) return value.toStringAsFixed(1);
+
+    final text = value.toString();
+    final match = RegExp(r'([\d.]+)').firstMatch(text);
+    return match?.group(1) ?? text;
   }
 }

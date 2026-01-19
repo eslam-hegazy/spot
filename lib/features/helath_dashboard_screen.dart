@@ -123,33 +123,38 @@ class _HealthDashboardScreenState extends State<HealthDashboardScreen> {
           final value =
               latestValues[type] ?? "0 ${_service.typeUnits[type] ?? ""}";
 
-          return Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-            elevation: 4,
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(iconForType(type), size: 40, color: Colors.blue),
-                  const SizedBox(height: 12),
-                  Text(
-                    type.name.replaceAll('_', ' ').toUpperCase(),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
+          return InkWell( onTap: (){
+
+            // print(va)
+          },
+            child: Card(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              elevation: 4,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(iconForType(type), size: 40, color: Colors.blue),
+                    const SizedBox(height: 12),
+                    Text(
+                      type.name.replaceAll('_', ' ').toUpperCase(),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    value.replaceAll('NumericHealthValue - numericValue:', ""),
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16, color: Colors.black87),
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      value.replaceAll('NumericHealthValue - numericValue:', ""),
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(fontSize: 16, color: Colors.black87),
+                    ),
+                  ],
+                ),
               ),
             ),
           );
